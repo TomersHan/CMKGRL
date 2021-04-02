@@ -2,7 +2,7 @@ import torch.nn as nn
 from cmrg.models.gcn_encoder import GCN_Encoder
 from cmrg.models.attention import Attention_out
 from cmrg.models.spgat import SpGAT
-from cmrg.models.dgi_sig import DGI_Sig
+from cmrg.models.dgi import DGI
 from cmrg.utils.func import batch_gat_loss, load_data, save_model, norm_embeddings, read_edge_index, batch_graph_gen, \
     gen_shuf_fts, gen_txt_file, load_graph
 from cmrg.models.convkb import ConvKB
@@ -29,44 +29,15 @@ class CMRG(nn.Module):
         self.relation_out_dim_1 = relation_out_dim[0]
         self.drop_GAT = drop_GAT
         self.alpha = alpha  # For leaky relu
-        self.sparse_gat_1 = SpGAT(self.num_nodes, 200, 100, 200,
-                                  self.drop_GAT, self.alpha, 2)
-        self.W_entities = nn.Parameter(torch.zeros(
-            size=(100, self.entity_out_dim_1 * self.nheads_GAT_1)))
-        nn.init.xavier_uniform_(self.W_entities.data, gain=1.414)
         self.final_entity_embeddings = nn.Parameter(torch.randn(initial_entity_emb.shape[0], 200))
         self.final_relation_embeddings = nn.Parameter(torch.randn(initial_relation_emb.shape[0], 200))
-        self.W_relations_out = nn.Parameter(torch.zeros(
-            size=(400, 200)))
-        nn.init.xavier_uniform_(self.W_relations_out.data, gain=1.414)
-        self.DGI = DGI_Sig(200, hid_units, nonlinearity)
-        # input-entity-multi-modal-feature
-        self.img_feat = (initial_entity_emb[:, :4096])
-        self.text_feat = (initial_entity_emb[:, 4096:])
-        # input-relation-multi-modal-feature
-        self.relation_embeddings = initial_relation_emb
+        self.DGI = DGI(200, hid_units, nonlinearity)
         self.relation_embeddings_ = nn.Parameter(torch.zeros(
             size=(initial_relation_emb.shape[0], 200)))
         nn.init.xavier_uniform_(self.relation_embeddings_.data, gain=1.414)
         self.entity_embeddings_ = nn.Parameter(torch.zeros(
             size=(initial_entity_emb.shape[0], 200)))
         nn.init.xavier_uniform_(self.entity_embeddings_.data, gain=1.414)
-        self.layer_relation_gat = nn.Sequential(
-            nn.Linear(300, 200),
-            nn.ReLU(),
-            nn.Dropout(self.dropout)
-        )
-        self.img_encoder = nn.Sequential(
-            nn.Linear(4096, 4),
-            nn.ReLU(),
-            nn.Dropout(self.dropout)
-        )
-        self.text_encoder = nn.Sequential(
-            nn.Linear(300, 196),
-            nn.ReLU(),
-            nn.Dropout(self.dropout)
-        )
-        # self.edge_index = read_edge_index(args)
         self.layer_emb = nn.Sequential(
             nn.Linear(400, 1),
         )
@@ -104,28 +75,20 @@ class CMRG(nn.Module):
         new_rel_embed = norm_embeddings(new_rel_embed)
         new_entity_embed_ = gen_shuf_fts(new_entity_embed)
         entity_con, rel_con = self.multi_context_encoder(new_entity_embed, new_rel_embed)
-
         entity_con_, rel_con_ = self.multi_context_encoder(new_entity_embed_, new_rel_embed)
-
         entity_global = self.high_order_encoder(entity_con)
         entity_global_ = self.high_order_encoder(entity_con_)
-
-        new_entity_embed = self.bn(entity_con)
-        new_rel_embed = self.bn(rel_con)
-
+        new_entity_embed = entity_con
+        new_rel_embed = rel_con
         local_logits = self.DGI(entity_con[np.newaxis],  entity_con_[np.newaxis], sparse, None, None, None)
-
         global_logits = self.DGI(entity_global[np.newaxis], entity_global_[np.newaxis], sparse, None, None, None)
-
         self.final_entity_embeddings.data = new_entity_embed.data
         self.final_relation_embeddings.data = new_rel_embed.data
-
         conv_input = torch.cat((new_entity_embed[batch_inputs[:, 0], :].unsqueeze(1),
                                 new_rel_embed[batch_inputs[:, 1]].unsqueeze(1),
                                 new_entity_embed[batch_inputs[:, 2], :].unsqueeze(1)),
                                dim=1)
         out_conv = self.convKB(conv_input)
-
         return out_conv, local_logits, global_logits
 
     def batch_test(self, batch_inputs):

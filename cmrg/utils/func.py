@@ -1,7 +1,6 @@
 import torch
 import os
 import pickle
-import numpy as np
 import tf_geometric as tfg
 import scipy.sparse as sp
 from tqdm import tqdm
@@ -199,7 +198,7 @@ def batch_graph_gen2(new_entity2id, batch_inputs, args):
 
 
 def read_edge_index(args):
-    file = args.data + "edge_index3.pickle"
+    file = args.data + "edge_index.pickle"
     with open(file, 'rb') as handle:
         edge_index = pickle.load(handle)
     return edge_index
@@ -241,12 +240,12 @@ def edge_index_gen(new_entity2id, new_1hop):
                 ori.append(val[tri[0]])
                 dst.append(val[tri[2]])
             edge_index.append(np.array([ori, dst]))
-    file = "edge_index3.pickle"
+    file = "edge_index.pickle"
     with open(file, 'wb') as handle:
         pickle.dump(edge_index, handle,
                     protocol=pickle.HIGHEST_PROTOCOL)
 def load_graph(args):
-    featuregraph_path = args.data + 'edges_train.txt'
+    featuregraph_path = args.data + 'edges_train_random_walk.txt'
     feature_edges = np.genfromtxt(featuregraph_path, dtype=np.int32)
     fedges = np.array(list(feature_edges), dtype=np.int32).reshape(feature_edges.shape)
     fadj = sp.coo_matrix((np.ones(fedges.shape[0]), (fedges[:, 0], fedges[:, 1])),

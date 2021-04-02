@@ -12,7 +12,9 @@ import pickle
 from tqdm import tqdm
 import math
 from cmrg.config.cuda import *
+
 set_random_seed(1234)
+
 
 class Corpus:
     def __init__(self, args, train_data, validation_data, test_data, entity2id,
@@ -500,10 +502,6 @@ class Corpus:
         return new_1hop, new_entity2id, multi_edge
 
     def get_validation_pred(self, args, model, unique_entities):
-        average_hits_at_10000_head, average_hits_at_10000_tail = [], []
-        average_hits_at_1000_head, average_hits_at_1000_tail = [], []
-        average_hits_at_500_head, average_hits_at_500_tail = [], []
-        average_hits_at_100_head, average_hits_at_100_tail = [], []
         average_hits_at_ten_head, average_hits_at_ten_tail = [], []
         average_hits_at_three_head, average_hits_at_three_tail = [], []
         average_hits_at_one_head, average_hits_at_one_tail = [], []
@@ -517,13 +515,8 @@ class Corpus:
             # print("Sampled indices")
             # print("test set length ", len(self.test_indices))
             entity_list = [j for i, j in self.entity2id.items()]
-
             ranks_head, ranks_tail = [], []
             reciprocal_ranks_head, reciprocal_ranks_tail = [], []
-            hits_at_10000_head, hits_at_10000_tail = 0, 0
-            hits_at_1000_head, hits_at_1000_tail = 0, 0
-            hits_at_500_head, hits_at_500_tail = 0, 0
-            hits_at_100_head, hits_at_100_tail = 0, 0
             hits_at_ten_head, hits_at_ten_tail = 0, 0
             hits_at_three_head, hits_at_three_tail = 0, 0
             hits_at_one_head, hits_at_one_tail = 0, 0
@@ -580,8 +573,6 @@ class Corpus:
                     np.where(sorted_indices_head.cpu().numpy() == 0)[0][0] + 1)
                 reciprocal_ranks_head.append(1.0 / ranks_head[-1])
 
-
-
                 # Tail part here
                 scores_tail = model.batch_test(new_x_batch_tail)
 
@@ -592,23 +583,7 @@ class Corpus:
                 ranks_tail.append(
                     np.where(sorted_indices_tail.cpu().numpy() == 0)[0][0] + 1)
                 reciprocal_ranks_tail.append(1.0 / ranks_tail[-1])
-                # print("sample - ", ranks_head[-1], ranks_tail[-1])
-                # with open("hits@1_tail.txt","a",encoding="utf-8") as f:
-                #     # if np.where(sorted_indices_head.cpu().numpy() == 0)[0][0] == 0:
-                #     #     temp = str(batch_indices[i][0])+"\t"+str(batch_indices[i][1])+"\t"+str(batch_indices[i][2])+"\n"
-                #     #     f.write(temp)
-                #     if np.where(sorted_indices_tail.cpu().numpy() == 0)[0][0] == 0:
-                #         temp = str(batch_indices[i][0])+"\t"+str(batch_indices[i][1])+"\t"+str(batch_indices[i][2])+"\n"
-                #         f.write(temp)
             for i in range(len(ranks_head)):
-                if ranks_head[i] <= 10000:
-                    hits_at_10000_head = hits_at_10000_head + 1
-                if ranks_head[i] <= 1000:
-                    hits_at_1000_head = hits_at_1000_head + 1
-                if ranks_head[i] <= 500:
-                    hits_at_500_head = hits_at_500_head + 1
-                if ranks_head[i] <= 100:
-                    hits_at_100_head = hits_at_100_head + 1
                 if ranks_head[i] <= 10:
                     hits_at_ten_head = hits_at_ten_head + 1
                 if ranks_head[i] <= 3:
@@ -617,14 +592,6 @@ class Corpus:
                     hits_at_one_head = hits_at_one_head + 1
 
             for i in range(len(ranks_tail)):
-                if ranks_tail[i] <= 10000:
-                    hits_at_10000_tail = hits_at_10000_tail + 1
-                if ranks_tail[i] <= 1000:
-                    hits_at_1000_tail = hits_at_1000_tail + 1
-                if ranks_tail[i] <= 500:
-                    hits_at_500_tail = hits_at_500_tail + 1
-                if ranks_tail[i] <= 100:
-                    hits_at_100_tail = hits_at_100_tail + 1
                 if ranks_tail[i] <= 10:
                     hits_at_ten_tail = hits_at_ten_tail + 1
                 if ranks_tail[i] <= 3:
@@ -634,14 +601,6 @@ class Corpus:
 
             assert len(ranks_head) == len(reciprocal_ranks_head)
             assert len(ranks_tail) == len(reciprocal_ranks_tail)
-            average_hits_at_10000_head.append(
-                hits_at_10000_head / len(ranks_head))
-            average_hits_at_1000_head.append(
-                hits_at_1000_head / len(ranks_head))
-            average_hits_at_500_head.append(
-                hits_at_500_head / len(ranks_head))
-            average_hits_at_100_head.append(
-                hits_at_100_head / len(ranks_head))
             average_hits_at_ten_head.append(
                 hits_at_ten_head / len(ranks_head))
             average_hits_at_three_head.append(
@@ -651,15 +610,6 @@ class Corpus:
             average_mean_rank_head.append(sum(ranks_head) / len(ranks_head))
             average_mean_recip_rank_head.append(
                 sum(reciprocal_ranks_head) / len(reciprocal_ranks_head))
-
-            average_hits_at_10000_tail.append(
-                hits_at_10000_tail / len(ranks_head))
-            average_hits_at_1000_tail.append(
-                hits_at_1000_tail / len(ranks_head))
-            average_hits_at_500_tail.append(
-                hits_at_500_tail / len(ranks_head))
-            average_hits_at_100_tail.append(
-                hits_at_100_tail / len(ranks_head))
             average_hits_at_ten_tail.append(
                 hits_at_ten_tail / len(ranks_head))
             average_hits_at_three_tail.append(
@@ -669,15 +619,6 @@ class Corpus:
             average_mean_rank_tail.append(sum(ranks_tail) / len(ranks_tail))
             average_mean_recip_rank_tail.append(
                 sum(reciprocal_ranks_tail) / len(reciprocal_ranks_tail))
-
-        cumulative_hits_10000 = (sum(average_hits_at_10000_head) / len(average_hits_at_10000_head)
-                                 + sum(average_hits_at_10000_tail) / len(average_hits_at_10000_tail)) / 2
-        cumulative_hits_1000 = (sum(average_hits_at_1000_head) / len(average_hits_at_1000_head)
-                                + sum(average_hits_at_1000_tail) / len(average_hits_at_1000_tail)) / 2
-        cumulative_hits_500 = (sum(average_hits_at_500_head) / len(average_hits_at_500_head)
-                               + sum(average_hits_at_500_tail) / len(average_hits_at_500_tail)) / 2
-        cumulative_hits_100 = (sum(average_hits_at_100_head) / len(average_hits_at_100_head)
-                               + sum(average_hits_at_100_tail) / len(average_hits_at_100_tail)) / 2
         cumulative_hits_ten = (sum(average_hits_at_ten_head) / len(average_hits_at_ten_head)
                                + sum(average_hits_at_ten_tail) / len(average_hits_at_ten_tail)) / 2
         cumulative_hits_three = (sum(average_hits_at_three_head) / len(average_hits_at_three_head)
@@ -690,19 +631,10 @@ class Corpus:
             average_mean_recip_rank_tail) / len(average_mean_recip_rank_tail)) / 2
 
         print("\nCumulative stats are -> ")
-        # print("Hits@10000 are {}".format(cumulative_hits_10000))
-        # print("Hits@1000 are {}".format(cumulative_hits_1000))
-        # print("Hits@500 are {}".format(cumulative_hits_500))
-        # print("Hits@100 are {}".format(cumulative_hits_100))
         print("Hits@10 are {}".format(cumulative_hits_ten))
         print("Hits@3 are {}".format(cumulative_hits_three))
         print("Hits@1 are {}".format(cumulative_hits_one))
         print("Mean rank {}".format(cumulative_mean_rank))
         print("Mean Reciprocal Rank {}".format(cumulative_mean_recip_rank))
-        return cumulative_hits_10000, cumulative_hits_1000, cumulative_hits_500, \
-               cumulative_hits_100, cumulative_hits_ten, cumulative_hits_three, \
+        return cumulative_hits_ten, cumulative_hits_three, \
                cumulative_hits_one, cumulative_mean_rank, cumulative_mean_recip_rank
-
-
-
-

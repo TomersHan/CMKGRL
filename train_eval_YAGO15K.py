@@ -14,6 +14,8 @@ from cmrg.utils.func import batch_gat_loss, load_data, save_model, norm_embeddin
     gen_shuf_fts, gen_txt_file, load_graph
 from cmrg.config.cuda import *
 from cmrg.models.cmrg import CMRG
+
+
 def parse_args():
     args = argparse.ArgumentParser()
     # network arguments
@@ -79,7 +81,7 @@ def parse_args():
 
     cmd = "--data ./data/YAGO15K/  " \
           "--model_name CMRG_YAGO15K " \
-          "--cuda 4 " \
+          "--cuda 1 " \
           "--cl_rate 0.001 " \
           "--epochs_gat 10001 " \
           "--valid_invalid_ratio_gat 2 " \
@@ -93,6 +95,7 @@ def parse_args():
     args = args.parse_args()
     return args
 
+
 args = parse_args()
 set_random_seed(1234)
 
@@ -101,16 +104,13 @@ CUDA = choonsr_cuda(args.cuda)
 Corpus_, entity_embeddings, relation_embeddings = load_data(args)
 
 
-
-
 def train_encoder(args):
-
     model_encoder = CMRG(args, nfeat=200, nhid1=400, nhid2=200, dropout=0.2,
-                          initial_entity_emb=entity_embeddings, initial_relation_emb=relation_embeddings,
-                          entity_out_dim=args.entity_out_dim, relation_out_dim=args.entity_out_dim,
-                          drop_GAT=args.drop_GAT, alpha=args.alpha, nheads_GAT=args.nheads_GAT, ft_size=200,
-                          hid_units=512, nonlinearity='prelu', Corpus_=Corpus_,
-                          )
+                         initial_entity_emb=entity_embeddings, initial_relation_emb=relation_embeddings,
+                         entity_out_dim=args.entity_out_dim, relation_out_dim=args.entity_out_dim,
+                         drop_GAT=args.drop_GAT, alpha=args.alpha, nheads_GAT=args.nheads_GAT, ft_size=200,
+                         hid_units=512, nonlinearity='prelu', Corpus_=Corpus_,
+                         )
 
     if CUDA:  model_encoder.cuda()
     optimizer = torch.optim.Adam(model_encoder.parameters(), lr=args.lr, weight_decay=args.weight_decay_gat)
@@ -150,15 +150,18 @@ def train_encoder(args):
                     train_values = Variable(torch.FloatTensor(train_values))
                 # forward pass
                 preds, local_logits, global_logits = model_encoder(Corpus_,
-                                              Corpus_.train_adj_matrix_topolopy,
-                                              train_indices,
-                                              current_batch_2hop_indices, sparse=True)
+                                                                   Corpus_.train_adj_matrix_topolopy,
+                                                                   train_indices,
+                                                                   current_batch_2hop_indices, sparse=True)
+                # for name, parameters in model_encoder.named_parameters():
+                #     print(name, ':', parameters.size())
+                # break
                 optimizer.zero_grad()
                 tri_loss = margin_loss(preds.view(-1), train_values.view(-1))
                 # CL_loss
                 cl_loss_local = b_xent(local_logits, lbl)
                 cl_loss_global = b_xent(global_logits, lbl)
-                loss = tri_loss + args.cl_rate*cl_loss_local+args.cl_rate*cl_loss_global
+                loss = tri_loss + args.cl_rate * cl_loss_local + args.cl_rate * cl_loss_global
                 loss.backward()
                 optimizer.step()
                 epoch_loss.append(loss.data.item())
@@ -173,40 +176,33 @@ def train_encoder(args):
                                                                                                             epoch_loss) / len(
                                                                                                             epoch_loss),
                                                                                                         time.time() - start_time,
-                                                                                    current_time)
+                                                                                                        current_time)
             log_encoder.write(temp)
             if epoch % 100 == 0 and epoch >= 4000:
                 save_model(model_encoder, epoch, args.output_folder)
             if epoch % 100 == 0 and epoch >= 4000:
                 model_encoder.eval()
                 with torch.no_grad():
-                    hits_10000, hits_1000, hits_500, \
-                    hits_100, hits_10, hits_3, \
+                    hits_10, hits_3, \
                     hits_1, mean_rank, mean_recip_rank = Corpus_.get_validation_pred(args, model_encoder,
                                                                                      Corpus_.unique_entities_train)
                     temp = "Current_time: {}\n" \
-                           "hits_10000:  {}\n" \
-                           "hits_1000:  {}\n" \
-                           "hits_500:  {}\n" \
-                           "hits_100:  {}\n" \
                            "hits_10:  {}\n" \
                            "hits_3:  {}\n" \
                            "hits_1:  {}\n" \
                            "mean_rank:  {}\n" \
-                           "mean_recip_rank:  {}\n".format(str(current_time), hits_10000, hits_1000,
-                                                           hits_500,
-                                                           hits_100, hits_10, hits_3,
+                           "mean_recip_rank:  {}\n".format(str(current_time), hits_10, hits_3,
                                                            hits_1, mean_rank, mean_recip_rank)
                     log_encoder.write(temp)
 
 
 def evaluate_test(args, unique_entities):
     model_encoder = CMRG(args, nfeat=200, nhid1=400, nhid2=200, dropout=0.2,
-                          initial_entity_emb=entity_embeddings, initial_relation_emb=relation_embeddings,
-                          entity_out_dim=args.entity_out_dim, relation_out_dim=args.entity_out_dim,
-                          drop_GAT=args.drop_GAT, alpha=args.alpha, nheads_GAT=args.nheads_GAT, ft_size=200,
-                          hid_units=512, nonlinearity='prelu', Corpus_=Corpus_,
-                          )
+                         initial_entity_emb=entity_embeddings, initial_relation_emb=relation_embeddings,
+                         entity_out_dim=args.entity_out_dim, relation_out_dim=args.entity_out_dim,
+                         drop_GAT=args.drop_GAT, alpha=args.alpha, nheads_GAT=args.nheads_GAT, ft_size=200,
+                         hid_units=512, nonlinearity='prelu', Corpus_=Corpus_,
+                         )
     model_encoder.load_state_dict(torch.load(
         '{0}/trained_best_model.pth'.format(args.output_folder)), strict=False)
 
@@ -216,5 +212,5 @@ def evaluate_test(args, unique_entities):
         Corpus_.get_validation_pred(args, model_encoder, unique_entities)
 
 
-# train_encoder(args)
+train_encoder(args)
 evaluate_test(args, Corpus_.unique_entities_train)

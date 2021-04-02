@@ -275,7 +275,7 @@ def sparse_mx_to_torch_sparse_tensor(sparse_mx):
 
 
 def load_graph_dgi(config):
-    struct_edges = np.genfromtxt(config.data + "edges_train.txt", dtype=np.int32)
+    struct_edges = np.genfromtxt(config.data + "edges_train_random_walk.txt", dtype=np.int32)
     sedges = np.array(list(struct_edges), dtype=np.int32).reshape(struct_edges.shape)
     sadj = sp.coo_matrix((np.ones(sedges.shape[0]), (sedges[:, 0], sedges[:, 1])), shape=(12842, 12842),
                          dtype=np.float32)
